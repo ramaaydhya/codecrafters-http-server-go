@@ -65,21 +65,26 @@ func main() {
 		fmt.Println("Failed to bind to port 4221")
 		os.Exit(1)
 	}
+	for {
+		conn, err := listener.Accept()
 
-	conn, err := listener.Accept()
+		if err != nil {
+			fmt.Println("Error accepting connection: ", err.Error())
+			os.Exit(1)
+		}
 
-	if err != nil {
-		fmt.Println("Error accepting connection: ", err.Error())
-		os.Exit(1)
+		go handleConnection(&conn)
 	}
+}
 
-	defer conn.Close()
+func handleConnection(conn *net.Conn) {
+	defer (*conn).Close()
 
 	var req = make([]byte, 1024)
-	conn.Read(req)
+	(*conn).Read(req)
 	var path = getPath(&req)
 	if isGet(&req) && bytes.Equal(path, []byte("/")) {
-		conn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
+		(*conn).Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
 		return
 	}
 	if isGet(&req) && bytes.Equal(path, []byte("/user-agent")) {
@@ -91,15 +96,16 @@ func main() {
 		}
 		var userAgent = make([]byte, uaEnd-uaBegin)
 		copy(userAgent, req[uaBegin:uaEnd])
-		respondGet(&conn, 200, &userAgent)
+		respondGet(conn, 200, &userAgent)
 		return
 	}
 	if isGet(&req) && bytes.HasPrefix(path, []byte("/echo")) {
 		after, _ := bytes.CutPrefix(path, []byte("/echo/"))
 		var body = make([]byte, 0, len(after))
 		body = append(body, after...)
-		respondGet(&conn, 200, &body)
+		respondGet(conn, 200, &body)
 		return
 	}
-	conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
+	(*conn).Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
+
 }
