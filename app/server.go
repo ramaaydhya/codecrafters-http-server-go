@@ -1,8 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
-	"strings"
+	"strconv"
 
 	// Uncomment this block to pass the first stage
 	"net"
@@ -31,9 +32,34 @@ func main() {
 
 	var req = make([]byte, 1024)
 	conn.Read(req)
-	if !strings.HasPrefix(string(req), "GET / HTTP/1.1") {
+
+	if bytes.HasPrefix(req, []byte("GET / HTTP/1.1")) {
+		conn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
+		return
+	}
+
+	var getEchoPrefix = []byte("GET /echo/")
+	if !bytes.HasPrefix(req, getEchoPrefix) {
 		conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
 		return
 	}
-	conn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
+
+	var strBegin = len(getEchoPrefix) // GET /echo/
+	var strEnd = strBegin
+	for req[strEnd] != ' ' {
+		strEnd++
+	}
+
+	var header = []byte("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: ")
+	var conLen = strEnd - strBegin
+	var bSlcConLen = []byte(strconv.Itoa(conLen))
+	var str = make([]byte, 0, len(header)+len(bSlcConLen)+4+conLen)
+
+	str = append(str, header...)
+	str = append(str, bSlcConLen...)
+	str = append(str, []byte("\r\n\r\n")...)
+	for i := strBegin; i < strEnd; i++ {
+		str = append(str, req[i])
+	}
+	conn.Write(str)
 }
